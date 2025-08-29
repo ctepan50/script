@@ -1,1 +1,5 @@
-game.Workspace.ctepanReallll.Humanoid.Walkspeed = 40
+local player = game.Players.LocalPlayer
+ while true do
+wait(0)
+player.Character.Humanoid.WalkSpeed = 60
+end
