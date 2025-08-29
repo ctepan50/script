@@ -1,5 +1,232 @@
-local player = game.Players.LocalPlayer
- while true do
-wait(0)
-player.Character.Humanoid.WalkSpeed = 60
+-- LocalScript (положить в StarterPlayerScripts)
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Настройки (легко менять)
+local ANIM_TIME = 0.28
+local BUTTON_STAGGER = 0.06
+local MENU_WIDTH = 360
+local MENU_HEIGHT = 420
+local BACKGROUND_TRANSPARENCY = 0.55
+
+-- Создаём GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "RightShiftMenuGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Полупрозрачный фон (закрывает кликами)
+local bg = Instance.new("Frame")
+bg.Name = "Background"
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.Position = UDim2.new(0, 0, 0, 0)
+bg.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+bg.BackgroundTransparency = 1 -- будет твиниться
+bg.BorderSizePixel = 0
+bg.Parent = screenGui
+bg.Visible = false
+
+local bgButton = Instance.new("TextButton") -- чтобы ловить клики
+bgButton.Name = "BgButton"
+bgButton.Size = UDim2.new(1,0,1,0)
+bgButton.Position = UDim2.new(0,0,0,0)
+bgButton.BackgroundTransparency = 1
+bgButton.Text = ""
+bgButton.Parent = bg
+
+-- Главное меню (по центру)
+local menu = Instance.new("Frame")
+menu.Name = "Menu"
+menu.Size = UDim2.new(0, 0, 0, 0) -- начнём с 0
+menu.Position = UDim2.new(0.5, 0, 0.5, 0)
+menu.AnchorPoint = Vector2.new(0.5, 0.5)
+menu.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+menu.BackgroundTransparency = 0.0
+menu.ClipsDescendants = true
+menu.Parent = bg
+
+local uicorner = Instance.new("UICorner")
+uicorner.Parent = menu
+uicorner.CornerRadius = UDim.new(0, 14)
+
+local uistroke = Instance.new("UIStroke")
+uistroke.Parent = menu
+uistroke.Thickness = 1
+uistroke.Transparency = 0.6
+
+-- Заголовок
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, 0, 0, 64)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Меню"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+title.TextColor3 = Color3.fromRGB(240,240,245)
+title.Parent = menu
+
+local underline = Instance.new("Frame")
+underline.Name = "Underline"
+underline.Size = UDim2.new(0.9, 0, 0, 2)
+underline.Position = UDim2.new(0.05, 0, 0, 64)
+underline.BackgroundColor3 = Color3.fromRGB(120,120,255)
+underline.BorderSizePixel = 0
+underline.Parent = menu
+
+-- Контейнер для кнопок
+local buttonsFrame = Instance.new("Frame")
+buttonsFrame.Name = "Buttons"
+buttonsFrame.Size = UDim2.new(1, -32, 1, -110)
+buttonsFrame.Position = UDim2.new(0, 16, 0, 84)
+buttonsFrame.BackgroundTransparency = 1
+buttonsFrame.Parent = menu
+
+local list = Instance.new("UIListLayout")
+list.Parent = buttonsFrame
+list.SortOrder = Enum.SortOrder.LayoutOrder
+list.Padding = UDim.new(0, 12)
+
+-- Пример кнопок (можешь изменить / добавить свои)
+local function createButton(text, order)
+	local b = Instance.new("TextButton")
+	b.Name = "Btn" .. tostring(order)
+	b.Size = UDim2.new(1, 0, 0, 46)
+	b.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+	b.BackgroundTransparency = 0
+	b.BorderSizePixel = 0
+	b.AutoButtonColor = true
+	b.Text = text
+	b.Font = Enum.Font.Gotham
+	b.TextSize = 18
+	b.TextColor3 = Color3.fromRGB(235,235,240)
+	b.ClipsDescendants = true
+	b.LayoutOrder = order
+	b.Parent = buttonsFrame
+
+	local c = Instance.new("UICorner")
+	c.Parent = b
+	c.CornerRadius = UDim.new(0, 10)
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Parent = b
+	stroke.Transparency = 0.7
+	stroke.Thickness = 1
+	return b
 end
+
+local items = {
+	"Новая игра",
+	"Настройки",
+	"Профиль",
+	"Выход"
+}
+
+for i, v in ipairs(items) do
+	createButton(v, i)
+end
+
+-- состояние
+local open = false
+local debounce = false
+
+-- твины
+local bgTweenInfo = TweenInfo.new(ANIM_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local menuOpenTweenInfo = TweenInfo.new(ANIM_TIME, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local menuCloseTweenInfo = TweenInfo.new(ANIM_TIME * 0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+local function openMenu()
+	if open or debounce then return end
+	debounce = true
+	open = true
+	bg.Visible = true
+
+	-- фон появляется
+	local bgTween = TweenService:Create(bg, bgTweenInfo, {BackgroundTransparency = BACKGROUND_TRANSPARENCY})
+	bgTween:Play()
+
+	-- меню увеличивается (pop)
+	local targetSize = UDim2.new(0, MENU_WIDTH, 0, MENU_HEIGHT)
+	menu.Size = UDim2.new(0, 0, 0, 0)
+	menu.Position = UDim2.new(0.5, 0, 0.5, 0)
+	local menuTween = TweenService:Create(menu, menuOpenTweenInfo, {Size = targetSize})
+	menuTween:Play()
+
+	-- поочерёдное появление кнопок (fade in)
+	for i, child in ipairs(buttonsFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			child.BackgroundTransparency = 1
+			child.TextTransparency = 1
+		end
+	end
+
+	menuTween.Completed:Connect(function()
+		-- анимируем кнопки по очереди
+		for i, child in ipairs(buttonsFrame:GetChildren()) do
+			if child:IsA("TextButton") then
+				local t = TweenService:Create(child, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {BackgroundTransparency = 0, TextTransparency = 0})
+				wait(BUTTON_STAGGER)
+				t:Play()
+			end
+		end
+		debounce = false
+	end)
+end
+
+local function closeMenu()
+	if (not open) or debounce then return end
+	debounce = true
+	open = false
+
+	-- прячем кнопки быстро
+	for i, child in ipairs(buttonsFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			local t = TweenService:Create(child, TweenInfo.new(0.12, Enum.EasingStyle.Quad), {BackgroundTransparency = 1, TextTransparency = 1})
+			t:Play()
+		end
+	end
+
+	-- уменьшение меню и затем фон
+	local menuTween = TweenService:Create(menu, menuCloseTweenInfo, {Size = UDim2.new(0, 0, 0, 0)})
+	menuTween:Play()
+	menuTween.Completed:Connect(function()
+		local bgTween = TweenService:Create(bg, bgTweenInfo, {BackgroundTransparency = 1})
+		bgTween:Play()
+		bgTween.Completed:Connect(function()
+			bg.Visible = false
+			debounce = false
+		end)
+	end)
+end
+
+-- Клик по фону закрывает
+bgButton.MouseButton1Click:Connect(function()
+	if open then closeMenu() end
+end)
+
+-- Обработка RightShift
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+	if gameProcessedEvent then return end
+	if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.RightShift then
+		if open then
+			closeMenu()
+		else
+			openMenu()
+		end
+	end
+end)
+
+-- Дополнительно: можно закрывать ESC
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+	if gameProcessedEvent then return end
+	if open and input.KeyCode == Enum.KeyCode.Escape then
+		closeMenu()
+	end
+end)
+
+-- Конец скрипта
